@@ -1,0 +1,34 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Generated datasets (large, regeneratable via generate_signup_data.py /
+# generate_payment_data.py) -- keep the directory via data/.gitkeep.
+data/*
+!data/.gitkeep
+
+# Trained model artifacts (large binaries, regeneratable via the training
+# notebooks/pipelines) -- keep the directory via artifacts/.gitkeep.
+artifacts/*
+!artifacts/.gitkeep
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Test / lint / type-checker caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
