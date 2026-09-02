@@ -1,0 +1,42 @@
+# FraudShield AI (importable package: trust_radar) -- direct dependencies,
+# pinned to the exact versions resolved in uv.lock and verified working in
+# this environment (Python >= 3.12, per pyproject.toml).
+#
+# This project uses uv (see pyproject.toml / uv.lock) as the source of truth.
+# This requirements.txt is a portable pip-install alternative for
+# environments without uv, e.g.:
+#
+#     python -m venv .venv
+#     .venv\Scripts\activate        (Windows)  or  source .venv/bin/activate (macOS/Linux)
+#     pip install -r requirements.txt
+#
+# To regenerate from the lock file instead of hand-editing this file:
+#     uv export --no-hashes --no-dev --format requirements-txt
+
+# --- Core ML / graph ---
+torch==2.13.0
+torch-geometric==2.8.0.post1
+lightgbm==4.7.0
+scikit-learn==1.9.0
+
+# --- Data ---
+pandas==3.0.5
+numpy==2.5.2
+joblib==1.5.3
+
+# --- Plotting (used by the notebooks) ---
+matplotlib==3.11.1
+
+# --- Notebooks ---
+jupyter==1.1.1
+ipykernel==7.3.0
+
+# --- Optional: Parquet support for generate_signup_data.py / -----------------
+# generate_payment_data.py (--format parquet). Not required for CSV output.
+# pyarrow==25.0.1
+
+# --- Dev tools (testing, linting, type-checking) -----------------------------
+# Install these too if you plan to run tests / ruff / mypy locally:
+pytest==9.1.1
+ruff==0.16.4
+mypy==2.3.1
