@@ -91,9 +91,12 @@ razor-hac/
 
 ## ⚡ Google Colab & Fast Start
 
-Because dataset streaming is connected directly to Hugging Face (`vicky1428/fraudshield-10m`), you don't need heavy notebooks or local data storage!
+You can train directly in Google Colab using GPU acceleration either with the turnkey notebook [colab_train.ipynb](file:///c:/Users/saima/OneDrive/Desktop/razor-hac/colab_train.ipynb) or from the terminal:
 
-### In Google Colab:
+### Option A: Open `colab_train.ipynb`
+Open `colab_train.ipynb` in Google Colab for interactive cells, GPU checks, metric plots, and one-click Drive/HF Hub export.
+
+### Option B: Terminal / Cell Quickstart
 ```bash
 # 1. Clone repository
 !git clone https://github.com/manideep1428/razorpay.git
@@ -103,8 +106,8 @@ Because dataset streaming is connected directly to Hugging Face (`vicky1428/frau
 !pip install -r requirements.txt
 !pip install torch-geometric
 
-# 3. Train models directly from 10M HF dataset (uses GPU if available)
-!python train.py --epochs 100 --trees 300
+# 3. Train models directly from HF dataset (smart shard loading, e.g. 500k rows)
+!python train.py --max-rows 500000 --epochs 100 --trees 300 --device cuda
 
 # 4. Evaluate against held-out test split
 !python test.py --test-rows 10000

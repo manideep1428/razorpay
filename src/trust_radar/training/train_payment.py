@@ -42,9 +42,15 @@ def train_payment_model(
     """
     cfg = config or PaymentModelConfig()
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=cfg.random_state, stratify=y
-    )
+    try:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=test_size, random_state=cfg.random_state, stratify=y
+        )
+    except ValueError:
+        # Fallback for very small datasets where a class may have < 2 members
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=test_size, random_state=cfg.random_state, stratify=None
+        )
 
     logger.info(
         "Training PaymentAbuseModel on %d samples, testing on %d samples...",

@@ -30,6 +30,21 @@ from trust_radar.utils.preprocessing import build_graph_data
 from trust_radar.utils.synthetic import synthesize_signup_edges
 
 
+import math
+from pathlib import Path
+
+def resolve_shards(category: str, split: str, max_rows: int | None) -> str | list[str]:
+    """Select only the needed parquet shards based on row count to avoid downloading all shards."""
+    if not max_rows:
+        return f"{category}/{split}/*.parquet"
+    needed = max(1, math.ceil(max_rows / 500_000))
+    max_avail = 18 if split == "train" else 2
+    needed = min(needed, max_avail)
+    if needed == 1:
+        return f"{category}/{split}/shard_000.parquet"
+    return [f"{category}/{split}/shard_{i:03d}.parquet" for i in range(needed)]
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Train FraudShield AI directly from Hugging Face Datasets.")
     parser.add_argument("--repo-id", type=str, default="vicky1428/fraudshield-10m", help="Hugging Face Dataset repo id (default: 'vicky1428/fraudshield-10m')")
@@ -39,6 +54,7 @@ def parse_args():
     parser.add_argument("--trees", type=int, default=300, help="LightGBM boosting trees (default: 300)")
     parser.add_argument("--calibrate", action="store_true", help="Enable 3-fold calibration for LightGBM")
     parser.add_argument("--device", type=str, default=None, help="Compute device ('cuda' or 'cpu')")
+    parser.add_argument("--save-dir", type=str, default=None, help="Directory to save model artifacts (default: artifacts/)")
     return parser.parse_args()
 
 
@@ -60,6 +76,10 @@ def main():
         print(f"GPU Name             : {torch.cuda.get_device_name(0)}")
         print(f"VRAM Available       : {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
 
+    save_dir = Path(args.save_dir) if args.save_dir else None
+    if save_dir:
+        save_dir.mkdir(parents=True, exist_ok=True)
+
     feat_cfg = FeatureConfig()
 
     # -----------------------------------------------------------------------
@@ -70,10 +90,12 @@ def main():
     print("-" * 75)
     t0 = time.time()
 
-    # Load signup training split from HF
+    # Smart shard loading: only download the shard(s) required by max_rows
+    signup_files = resolve_shards("signup", "train", args.max_rows)
+    print(f"Fetching shard(s): {signup_files}")
     ds_signup = load_dataset(
         args.repo_id,
-        data_dir="signup",
+        data_files={"train": signup_files},
         split="train",
         token=token,
     )
@@ -101,6 +123,9 @@ def main():
         learning_rate=0.005,
         pos_weight=5.0,
     )
+    if save_dir:
+        cfg_signup.checkpoint_path = save_dir / "signup_graphsage.pt"
+
     model_gnn, history = train_signup_gnn(data, config=cfg_signup, device=device)
     gnn_time = time.time() - t_train_gnn
     print(f"[SUCCESS] GNN training complete in {gnn_time:.2f}s ({(gnn_time/60):.2f} min)!")
@@ -127,9 +152,11 @@ def main():
     print("-" * 75)
     t0 = time.time()
 
+    payment_files = resolve_shards("payment", "train", args.max_rows)
+    print(f"Fetching shard(s): {payment_files}")
     ds_payment = load_dataset(
         args.repo_id,
-        data_dir="payment",
+        data_files={"train": payment_files},
         split="train",
         token=token,
     )
@@ -153,6 +180,9 @@ def main():
     print(f"\nTRAINING MULTI-CLASS PAYMENT MODEL (LightGBM {args.trees} Trees)...")
     t_train_pay = time.time()
     cfg_pay = PaymentModelConfig(n_estimators=args.trees, learning_rate=0.05)
+    if save_dir:
+        cfg_pay.model_path = save_dir / "payment_abuse_lgbm.joblib"
+
     model_pay, pay_metrics = train_payment_model(
         X, y, config=cfg_pay, test_size=0.2, calibrate=args.calibrate
     )

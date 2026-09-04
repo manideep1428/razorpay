@@ -19,6 +19,9 @@ dependencies = [
     "matplotlib",
     "jupyter",
     "ipykernel",
+    "pyarrow>=18.0.0",
+    "huggingface-hub>=0.28.0",
+    "datasets>=3.0.0",
 ]
 
 [project.optional-dependencies]
