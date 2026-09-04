@@ -69,7 +69,6 @@ razor-hac/
 ├── README.md
 ├── train.py                 # Primary training entrypoint (streams from Hugging Face Hub)
 ├── test.py                  # Primary evaluation entrypoint (held-out test split)
-├── upload_to_hf.py          # 10M synthetic dataset generator & HF Hub uploader
 ├── artifacts/               # Trained model checkpoints (.pt, .joblib)
 ├── data/                    # Local scratch directory (.gitkeep)
 ├── src/
