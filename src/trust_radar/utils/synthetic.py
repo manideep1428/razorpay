@@ -60,22 +60,11 @@ _FLAG_HINTS = (
     "flag",
     "detected",
     "enabled",
-    "matches",
-    "verified",
-    "accepted",
-    "completed",
     "_used",
     "prepaid",
     "debit",
     "credit",
-    "solved",
-    "impossible",
-    "invited",
-    "has_phone",
-    "do_not_track",
-    "mx_valid",
     "free_provider",
-    "role_based_email",
     "is_disposable_email",
     "is_trial",
     "is_discounted",
@@ -90,10 +79,27 @@ def _sigmoid(x: np.ndarray) -> np.ndarray:
 # ---------------------------------------------------------------------------
 # Realistic-looking value generators (emails, hashes, IPs, user agents, phones)
 # ---------------------------------------------------------------------------
-_FREE_EMAIL_DOMAINS = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com"]
+_FREE_EMAIL_DOMAINS = [
+    "gmail.com",
+    "outlook.com",
+    "yahoo.com",
+    "hotmail.com",
+    "icloud.com",
+    "proton.me",
+    "zoho.com",
+    "aol.com",
+    "gmx.com",
+    "mail.com",
+]
 _BUSINESS_EMAIL_DOMAINS = [
-    "acme-corp.com", "globex.io", "initech.co", "umbrella-inc.com",
-    "stark-industries.com", "wayneenterprises.com", "hooli.com", "piedpiper.io",
+    "google.com",
+    "microsoft.com",
+    "amazon.com",
+    "apple.com",
+    "meta.com",
+    "ibm.com",
+    "oracle.com",
+    "salesforce.com",
 ]
 _DISPOSABLE_EMAIL_DOMAINS = [
     "mailinator.com", "10minutemail.com", "guerrillamail.com",
@@ -318,7 +324,7 @@ def _fill_generic(col: str, n: int, rng: np.random.Generator) -> np.ndarray:
 def synthesize_signup_dataset(
     n: int = 2000, seed: int | None = 42
 ) -> pd.DataFrame:
-    """Generate a synthetic signup dataset with the full FraudShield schema.
+    """Generate a synthetic signup dataset with the streamlined FraudShield schema.
 
     Returns a DataFrame containing identifier columns, every signup feature, and
     the label columns (``label``, ``admin_reviewed``, ``review_result``).
@@ -334,41 +340,31 @@ def synthesize_signup_dataset(
     z_pos = np.maximum(z, 0.0)
 
     # Driver features correlated with the latent factor -----------------------
-    data["accounts_per_device_30d"] = rng.poisson(np.exp(0.2 + 0.9 * z_pos))
-    data["accounts_per_device_7d"] = np.minimum(
-        data["accounts_per_device_30d"], rng.poisson(np.exp(0.1 + 0.7 * z_pos))
-    )
-    data["accounts_per_device_1d"] = np.minimum(
-        data["accounts_per_device_7d"], rng.poisson(np.exp(0.6 * z_pos))
-    )
-    data["accounts_per_ip_30d"] = rng.poisson(np.exp(0.3 + 0.8 * z_pos))
-    data["abuse_rate_per_device"] = np.round(
-        np.clip(0.02 + 0.25 * _sigmoid(z) + rng.normal(0, 0.02, n), 0, 1), 4
-    )
-    data["abuse_rate_per_ip"] = np.round(
-        np.clip(0.02 + 0.22 * _sigmoid(z) + rng.normal(0, 0.02, n), 0, 1), 4
-    )
+    data["accounts_per_device_7d"] = rng.poisson(np.exp(0.1 + 0.7 * z_pos))
+    data["accounts_per_ip_7d"] = rng.poisson(np.exp(0.2 + 0.8 * z_pos))
     data["banned_accounts_per_device"] = rng.poisson(np.exp(-0.5 + 0.8 * z_pos))
     data["shared_device_count"] = rng.poisson(np.exp(0.7 * z_pos))
-    data["shared_ip_count"] = rng.poisson(np.exp(0.6 * z_pos))
-    data["is_disposable_email"] = rng.binomial(1, _sigmoid(-1.4 + z))
-    data["vpn_flag"] = rng.binomial(1, _sigmoid(-1.0 + 0.7 * z))
-    data["proxy_flag"] = rng.binomial(1, _sigmoid(-1.6 + 0.7 * z))
     data["device_trust_score"] = np.round(
         np.clip(72 - 20 * z + rng.normal(0, 6, n), 0, 100), 2
     )
-    data["graph_trust_score"] = np.round(
-        np.clip(72 - 22 * z + rng.normal(0, 6, n), 0, 100), 2
+    data["device_age_days"] = np.round(
+        np.clip(450 - 120 * z + rng.normal(0, 50, n), 1, 2000), 1
     )
-    data["community_risk_score"] = np.round(
-        np.clip(35 + 22 * z + rng.normal(0, 6, n), 0, 100), 2
+    data["plus_alias_used"] = rng.binomial(1, _sigmoid(-1.8 + 0.8 * z))
+    data["vpn_flag"] = rng.binomial(1, _sigmoid(-1.0 + 0.7 * z))
+    data["proxy_flag"] = rng.binomial(1, _sigmoid(-1.6 + 0.7 * z))
+    data["tor_flag"] = rng.binomial(1, _sigmoid(-2.8 + 0.9 * z))
+    data["datacenter_ip_flag"] = rng.binomial(1, _sigmoid(-1.5 + 0.8 * z))
+    data["private_mode_detected"] = rng.binomial(1, _sigmoid(-1.2 + 0.6 * z))
+    data["session_duration_seconds"] = np.round(
+        np.clip(45.0 - 25.0 * _sigmoid(z) + rng.exponential(15, n), 0.5, 300.0), 2
     )
-    data["abusive_neighbors"] = rng.poisson(np.exp(0.7 * z_pos))
-    data["high_risk_neighbor_count"] = rng.poisson(np.exp(0.6 * z_pos))
-    data["email_username_entropy"] = np.round(
-        np.clip(3.0 + 1.2 * z + rng.normal(0, 0.4, n), 0.5, 6.5), 3
-    )
-    data["captcha_solved"] = rng.binomial(1, _sigmoid(1.2 - 0.9 * z))
+
+    # Hardware profile pools
+    data["screen_width"] = rng.choice([1920, 1440, 1366, 1280, 2560], size=n)
+    data["screen_height"] = rng.choice([1080, 900, 768, 720, 1440], size=n)
+    data["cpu_cores"] = rng.choice([2, 4, 6, 8, 12, 16], size=n)
+    data["device_memory_gb"] = rng.choice([4, 8, 16, 32], size=n)
 
     # Identifier columns -------------------------------------------------------
     data["user_id"] = np.array([f"u_{i:07d}" for i in range(n)])
@@ -376,11 +372,7 @@ def synthesize_signup_dataset(
         rng.integers(0, 240 * 24 * 3600, n), unit="s"
     )
 
-    # Device fingerprint as a real-looking hex hash. This represents a stable
-    # cookie/localStorage identifier set at signup (Tier 3: signup velocity),
-    # NOT a canvas/audio/font browser-rendering fingerprint (Tier 4) -- this
-    # product does not run a fingerprinting SDK. Values repeat across rows
-    # (indexed from a smaller pool) so shared-device abuse signals still show up.
+    # Device fingerprint as a real-looking hex hash.
     device_pool = _random_hex(rng, max(2, n // 3), 32)
     data["device_fingerprint"] = device_pool[rng.integers(0, len(device_pool), n)]
 
@@ -388,10 +380,7 @@ def synthesize_signup_dataset(
     ip_pool = _random_ipv4(rng, max(2, n // 3))
     data["ip_address"] = ip_pool[rng.integers(0, len(ip_pool), n)]
 
-    # Fill every remaining schema column with plausible noise BEFORE assembling
-    # the composite identity fields below, since email/UA/phone are derived
-    # from columns (is_disposable_email, browser_family, phone_country, ...)
-    # that must already exist.
+    # Fill every remaining schema column with categorical/generic pools
     all_cols = cfg.signup_features + [
         c for c in SIGNUP_IDENTIFIER_COLUMNS if c not in data
     ]
@@ -399,35 +388,26 @@ def synthesize_signup_dataset(
         if col not in data:
             data[col] = _fill_generic(col, n, rng)
 
-    # Realistic email address, consistent with is_disposable_email /
-    # free_provider / role_based_email / plus_alias_used, and used to derive
-    # email_length / email_username_entropy (instead of the reverse).
+    # Realistic email address
+    is_disp = rng.binomial(1, 0.05, n)
+    is_free = rng.binomial(1, 0.85, n)
+    role_based = rng.binomial(1, 0.02, n)
     data["email_address"] = _make_emails(
         rng, n,
-        is_disposable=data["is_disposable_email"],
-        free_provider=data["free_provider"],
-        role_based=data["role_based_email"],
+        is_disposable=is_disp,
+        free_provider=is_free,
+        role_based=role_based,
         plus_alias=data["plus_alias_used"],
-        entropy_hint=data["email_username_entropy"],
+        entropy_hint=np.full(n, 3.0),
     )
-    data["email_length"] = np.array([len(e) for e in data["email_address"]])
-    data["email_username_entropy"] = np.array(
-        [len(set(e.split("@")[0])) / max(1, len(e.split("@")[0])) * 6.5 for e in data["email_address"]]
-    ).round(3)
 
-    # Real-looking User-Agent string, consistent with browser_family /
-    # browser_major_version / os_family.
+    # Real-looking User-Agent string
+    browser_major = rng.choice([110, 115, 120, 124, 128], size=n)
     data["user_agent"] = _make_user_agents(
         rng, n,
         browser_family=data["browser_family"],
-        browser_major=data["browser_major_version"],
+        browser_major=browser_major,
         os_family=data["os_family"],
-    )
-    data["user_agent_length"] = np.array([len(ua) for ua in data["user_agent"]])
-
-    # E.164-style phone number, consistent with has_phone / phone_country.
-    data["phone_number"] = _make_phone_numbers(
-        rng, n, phone_country=data["phone_country"], has_phone=data["has_phone"]
     )
 
     # Label bookkeeping columns ------------------------------------------------
@@ -568,9 +548,16 @@ def synthesize_payment_dataset(
     # shared-card / shared-device / shared-IP abuse signals still show up.
     card_pool = _random_hex(rng, max(2, n // 3), 32)
     device_pool = _random_hex(rng, max(2, n // 3), 32)
+    signup_device_pool = _random_hex(rng, max(2, n // 3), 32)
     ip_pool = _random_ipv4(rng, max(2, n // 3))
+
     data["card_fingerprint"] = card_pool[rng.integers(0, len(card_pool), n)]
-    data["device_fingerprint"] = device_pool[rng.integers(0, len(device_pool), n)]
+    data["signup_device_fingerprint"] = signup_device_pool[rng.integers(0, len(signup_device_pool), n)]
+    data["payment_device_fingerprint"] = np.where(
+        rng.random(n) < 0.75,
+        data["signup_device_fingerprint"],
+        device_pool[rng.integers(0, len(device_pool), n)],
+    )
     data["ip_address"] = ip_pool[rng.integers(0, len(ip_pool), n)]
 
     # Fill remaining schema columns with plausible noise -----------------------

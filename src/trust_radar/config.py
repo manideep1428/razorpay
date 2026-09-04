@@ -42,195 +42,50 @@ PAYMENT_NUM_CLASSES = len(PAYMENT_LABELS)
 
 
 # ---------------------------------------------------------------------------
-# Signup feature schema (grouped exactly as in the FraudShield AI spec)
+# Signup feature schema (Streamlined, production-focused fraud detection)
 # ---------------------------------------------------------------------------
 SIGNUP_FEATURE_GROUPS: dict[str, list[str]] = {
     "identity": [
         "signup_method",
         "oauth_provider",
         "account_type",
-        "email_verified",
-        "has_phone",
-        "phone_verified",
-        "profile_completed",
-        "terms_accepted",
-        "referral_used",
-        "invited_user",
     ],
     "email": [
-        "is_disposable_email",
-        "mx_valid",
-        "domain_age_days",
-        "free_provider",
-        "role_based_email",
         "plus_alias_used",
-        "domain_reputation_score",
-        "users_per_domain_1d",
-        "users_per_domain_7d",
-        "users_per_domain_30d",
-        "abuse_rate_per_domain",
-        "email_length",
-        "email_username_entropy",
     ],
-    # Phone is OPTIONAL. A missing phone must NOT reduce trust (see decisioning).
-    "phone": [
-        "voip_flag",
-        "phone_country",
-        "phone_age_days",
-        "users_per_phone_30d",
-        "abuse_rate_per_phone",
-        "country_matches_phone",
-    ],
-    "browser": [
-        "browser_family",
-        "browser_major_version",
-        "browser_minor_version",
-        "language",
-        "languages_count",
-        "cookies_enabled",
-        "do_not_track",
-        "pdf_viewer_enabled",
-        "adblock_detected",
-        "private_mode_detected",
-        "user_agent_length",
-        "touch_points",
-        "color_depth",
-    ],
-    "device": [
-        "device_type",
-        "os_family",
-        "os_version",
-        "platform",
-        "cpu_cores",
-        "device_memory_gb",
+    "device_fingerprint": [
         "screen_width",
         "screen_height",
-        "pixel_ratio",
+        "cpu_cores",
+        "device_memory_gb",
+        "platform",
         "timezone",
-        "utc_offset",
-        "font_count",
+        "private_mode_detected",
+        "device_type",
+        "browser_family",
+        "os_family",
     ],
-    # Most important section for multi-account / device-farming detection.
     "device_reputation": [
         "device_age_days",
-        "first_seen_days_ago",
-        "last_seen_days_ago",
-        "accounts_per_device_1d",
         "accounts_per_device_7d",
-        "accounts_per_device_30d",
-        "abuse_rate_per_device",
         "banned_accounts_per_device",
-        "successful_accounts_per_device",
+        "shared_device_count",
         "device_trust_score",
-        "device_cluster_size",
     ],
     "ip_intelligence": [
         "ip_country",
-        "ip_region",
-        "ip_city",
-        "asn",
-        "isp",
         "vpn_flag",
         "proxy_flag",
         "tor_flag",
-        "hosting_provider_flag",
-        "residential_ip_flag",
-        "mobile_network_flag",
-        "public_wifi_flag",
         "datacenter_ip_flag",
-        "ip_age_days",
-        "ip_reputation_score",
-    ],
-    "ip_reputation": [
-        "accounts_per_ip_1d",
         "accounts_per_ip_7d",
-        "accounts_per_ip_30d",
-        "abuse_rate_per_ip",
-        "banned_accounts_per_ip",
-        "successful_accounts_per_ip",
-        "countries_seen_on_ip",
-        "devices_seen_on_ip",
-        "unique_users_per_ip",
-    ],
-    "geo_consistency": [
-        "timezone_matches_country",
-        "language_matches_country",
-        "phone_country_matches_ip",
-        "browser_language_matches_ip",
-        "timezone_matches_phone",
-        "timezone_matches_browser",
-        "country_change_frequency",
-        "city_change_frequency",
-        "geo_risk_score",
-        "travel_speed_impossible",
     ],
     "behavior": [
-        "signup_hour",
-        "signup_day_of_week",
         "session_duration_seconds",
-        "page_views_before_signup",
-        "click_count",
-        "scroll_depth",
-        "mouse_movements",
-        "keystroke_count",
-        "paste_events",
-        "time_to_email_verify_seconds",
-        "time_to_complete_signup_seconds",
-        "form_error_count",
-        "captcha_solved",
-        "behavior_score",
-    ],
-    "historical": [
-        "previous_accounts_same_email",
-        "previous_accounts_same_phone",
-        "previous_accounts_same_device",
-        "previous_accounts_same_ip",
-        "previous_bans",
-        "previous_reviews",
-        "account_reactivation_count",
-    ],
-    "relationship": [
-        "shared_device_count",
-        "shared_ip_count",
-        "shared_phone_count",
-        "shared_email_domain_count",
-        "shared_cookie_count",
-        "shared_browser_count",
-        "shared_asn_count",
-        "linked_account_count",
-        "high_risk_neighbor_count",
-        "medium_risk_neighbor_count",
-        "low_risk_neighbor_count",
-    ],
-    "graph": [
-        "cluster_size",
-        "abusive_neighbors",
-        "avg_neighbor_risk",
-        "max_neighbor_risk",
-        "distance_to_known_abuser",
-        "device_centrality",
-        "ip_centrality",
-        "phone_centrality",
-        "community_risk_score",
-        "pagerank_score",
-        "connected_component_size",
-        "graph_trust_score",
     ],
 }
 
-# Raw identifiers that key the graph but are NOT fed to the model.
-# email_address / ip_address / user_agent / phone_number are realistic, printable
-# representations of the already-modeled features (email_length, ip_country,
-# user_agent_length, phone_country, ...) -- they exist for readability/joins
-# only and are intentionally excluded from SIGNUP_FEATURE_GROUPS.
-#
-# Tier 4 browser/canvas/audio/font fingerprinting columns (canvas_hash,
-# audio_hash, font_hash, webgl_vendor, webgl_renderer, webdriver_detected) were
-# removed: they require a third-party fingerprinting SDK (e.g. FingerprintJS)
-# that this product does not run. Signup fraud detection instead relies on
-# Tiers 1-3: IP reputation, email reputation, and signup velocity/history
-# (accounts_per_device_*, accounts_per_ip_*, abuse_rate_per_*, etc.), which are
-# collected from the request itself and the product's own signup history.
+# Raw identifiers that key the records and graph.
 SIGNUP_IDENTIFIER_COLUMNS: list[str] = [
     "user_id",
     "created_at",
@@ -238,7 +93,6 @@ SIGNUP_IDENTIFIER_COLUMNS: list[str] = [
     "device_fingerprint",
     "ip_address",
     "user_agent",
-    "phone_number",
 ]
 
 # Categorical (string) signup features requiring encoding.
@@ -246,19 +100,12 @@ SIGNUP_CATEGORICAL_FEATURES: list[str] = [
     "signup_method",
     "oauth_provider",
     "account_type",
-    "phone_country",
-    "browser_family",
-    "language",
-    "device_type",
-    "os_family",
-    "os_version",
     "platform",
     "timezone",
+    "device_type",
+    "browser_family",
+    "os_family",
     "ip_country",
-    "ip_region",
-    "ip_city",
-    "asn",
-    "isp",
 ]
 
 # Admin / label bookkeeping columns.
@@ -381,7 +228,8 @@ PAYMENT_IDENTIFIER_COLUMNS: list[str] = [
     "user_id",
     "organization_id",
     "card_fingerprint",
-    "device_fingerprint",
+    "signup_device_fingerprint",
+    "payment_device_fingerprint",
     "ip_address",
 ]
 
