@@ -31,7 +31,11 @@ def generate_and_save_parquet(
     name: str = "dataset",
 ):
     """Stream dataset generation into train and test Parquet shards."""
-    output_dir.mkdir(parents=True, exist_ok=True)
+    train_dir = output_dir / "train"
+    test_dir = output_dir / "test"
+    train_dir.mkdir(parents=True, exist_ok=True)
+    test_dir.mkdir(parents=True, exist_ok=True)
+
     test_rows = int(total_rows * test_ratio)
     train_rows = total_rows - test_rows
 
@@ -41,7 +45,7 @@ def generate_and_save_parquet(
     shard_idx = 0
     for start, size in chunk_ranges(train_rows, chunk_size):
         t0 = time.time()
-        shard_path = output_dir / f"train_{shard_idx:03d}.parquet"
+        shard_path = train_dir / f"shard_{shard_idx:03d}.parquet"
         print(f"  Generating train shard {shard_idx} ({size:,} rows)...", end="", flush=True)
 
         df = generator_fn(n=size, seed=1000 + shard_idx)
@@ -57,7 +61,7 @@ def generate_and_save_parquet(
     test_shard_idx = 0
     for start, size in chunk_ranges(test_rows, chunk_size):
         t0 = time.time()
-        shard_path = output_dir / f"test_{test_shard_idx:03d}.parquet"
+        shard_path = test_dir / f"shard_{test_shard_idx:03d}.parquet"
         print(f"  Generating test shard {test_shard_idx} ({size:,} rows)...", end="", flush=True)
 
         df = generator_fn(n=size, seed=9000 + test_shard_idx)
@@ -130,6 +134,41 @@ def main():
         chunk_size=args.chunk_size,
         name="payment",
     )
+
+    # Write Dataset Card (README.md)
+    readme_path = base_dir / "README.md"
+    readme_content = f"""---
+license: apache-2.0
+task_categories:
+- tabular-classification
+- graph-ml
+tags:
+- fraud-detection
+- graphsage
+- lightgbm
+- fintech
+- trust-radar
+size_categories:
+- 10M<n<100M
+---
+
+# FraudShield AI: 10M Synthetic Fraud & Abuse Dataset
+
+This dataset contains **{args.rows:,}** synthetic signup events and **{args.rows:,}** synthetic payment events modeled after enterprise fintech trust and anti-abuse systems.
+
+## Dataset Structure
+- `signup/`: Features for Graph Neural Network (GraphSAGE) signup trust scoring (train: 90%, test: 10%).
+- `payment/`: Features for multi-class LightGBM payment abuse classification (train: 90%, test: 10%).
+
+## Quickstart
+```python
+from datasets import load_dataset
+
+signup_train = load_dataset("{args.repo_id}", data_dir="signup", split="train")
+payment_train = load_dataset("{args.repo_id}", data_dir="payment", split="train")
+```
+"""
+    readme_path.write_text(readme_content, encoding="utf-8")
 
     # Upload to Hugging Face
     upload_to_huggingface(local_dir=base_dir, repo_id=args.repo_id, token=token)
