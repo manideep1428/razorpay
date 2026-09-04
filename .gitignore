@@ -9,10 +9,22 @@ wheels/
 # Virtual environments
 .venv
 
-# Generated datasets (large, regeneratable via generate_signup_data.py /
-# generate_payment_data.py) -- keep the directory via data/.gitkeep.
+# Generated datasets (large binaries / tables for Hugging Face)
+*.csv
+*.parquet
+*.pq
+*.arrow
+*.feather
+*.h5
 data/*
 !data/.gitkeep
+hf_data/
+
+# Hugging Face & dataset caches
+.cache/
+hf_cache/
+huggingface/
+datasets_cache/
 
 # Trained model artifacts (large binaries, regeneratable via the training
 # notebooks/pipelines) -- keep the directory via artifacts/.gitkeep.
