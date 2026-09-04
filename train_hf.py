@@ -3,7 +3,16 @@
 import argparse
 import gc
 import os
+import socket
 import time
+
+# Force IPv4 socket resolution to prevent Windows IPv6 DNS timeouts
+_orig_getaddrinfo = socket.getaddrinfo
+def _ipv4_getaddrinfo(*args, **kwargs):
+    res = _orig_getaddrinfo(*args, **kwargs)
+    ipv4 = [r for r in res if r[0] == socket.AF_INET]
+    return ipv4 if ipv4 else res
+socket.getaddrinfo = _ipv4_getaddrinfo
 
 import pandas as pd
 import torch

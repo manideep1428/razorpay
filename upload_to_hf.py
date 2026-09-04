@@ -4,8 +4,17 @@ import argparse
 import gc
 import os
 import shutil
+import socket
 import time
 from pathlib import Path
+
+# Force IPv4 socket resolution to prevent Windows IPv6 DNS timeouts
+_orig_getaddrinfo = socket.getaddrinfo
+def _ipv4_getaddrinfo(*args, **kwargs):
+    res = _orig_getaddrinfo(*args, **kwargs)
+    ipv4 = [r for r in res if r[0] == socket.AF_INET]
+    return ipv4 if ipv4 else res
+socket.getaddrinfo = _ipv4_getaddrinfo
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -30,7 +39,7 @@ def generate_and_save_parquet(
     test_ratio: float = 0.1,
     name: str = "dataset",
 ):
-    """Stream dataset generation into train and test Parquet shards."""
+    """Stream dataset generation into train and test Parquet shards (skips if already generated)."""
     train_dir = output_dir / "train"
     test_dir = output_dir / "test"
     train_dir.mkdir(parents=True, exist_ok=True)
@@ -39,19 +48,22 @@ def generate_and_save_parquet(
     test_rows = int(total_rows * test_ratio)
     train_rows = total_rows - test_rows
 
-    print(f"\n--- Generating {name.upper()} ({total_rows:,} total: {train_rows:,} train / {test_rows:,} test) ---")
+    print(f"\n--- Checking/Generating {name.upper()} ({total_rows:,} total: {train_rows:,} train / {test_rows:,} test) ---")
 
     # 1. Generate Train Shards
     shard_idx = 0
     for start, size in chunk_ranges(train_rows, chunk_size):
-        t0 = time.time()
         shard_path = train_dir / f"shard_{shard_idx:03d}.parquet"
-        print(f"  Generating train shard {shard_idx} ({size:,} rows)...", end="", flush=True)
+        if shard_path.exists() and shard_path.stat().st_size > 100_000:
+            print(f"  Train shard {shard_idx} already cached on disk ({shard_path.stat().st_size / 1e6:.1f} MB).")
+            shard_idx += 1
+            continue
 
+        t0 = time.time()
+        print(f"  Generating train shard {shard_idx} ({size:,} rows)...", end="", flush=True)
         df = generator_fn(n=size, seed=1000 + shard_idx)
         table = pa.Table.from_pandas(df, preserve_index=False)
         pq.write_table(table, shard_path, compression="snappy")
-
         del df, table
         gc.collect()
         print(f" Saved in {time.time() - t0:.1f}s ({shard_path.stat().st_size / 1e6:.1f} MB)")
@@ -60,14 +72,17 @@ def generate_and_save_parquet(
     # 2. Generate Test Shards
     test_shard_idx = 0
     for start, size in chunk_ranges(test_rows, chunk_size):
-        t0 = time.time()
         shard_path = test_dir / f"shard_{test_shard_idx:03d}.parquet"
-        print(f"  Generating test shard {test_shard_idx} ({size:,} rows)...", end="", flush=True)
+        if shard_path.exists() and shard_path.stat().st_size > 100_000:
+            print(f"  Test shard {test_shard_idx} already cached on disk ({shard_path.stat().st_size / 1e6:.1f} MB).")
+            test_shard_idx += 1
+            continue
 
+        t0 = time.time()
+        print(f"  Generating test shard {test_shard_idx} ({size:,} rows)...", end="", flush=True)
         df = generator_fn(n=size, seed=9000 + test_shard_idx)
         table = pa.Table.from_pandas(df, preserve_index=False)
         pq.write_table(table, shard_path, compression="snappy")
-
         del df, table
         gc.collect()
         print(f" Saved in {time.time() - t0:.1f}s ({shard_path.stat().st_size / 1e6:.1f} MB)")
@@ -75,25 +90,57 @@ def generate_and_save_parquet(
 
 
 def upload_to_huggingface(local_dir: Path, repo_id: str, token: str | None = None):
-    """Upload data directory directly to Hugging Face Datasets repo."""
+    """Upload dataset files shard by shard with automatic retry and skip logic."""
     try:
         from huggingface_hub import HfApi, create_repo
     except ImportError:
         raise ImportError("huggingface_hub is required. Install via: pip install huggingface_hub")
 
     api = HfApi(token=token)
-    print(f"\nCreating / connecting to Hugging Face dataset repository: {repo_id} ...")
+    print(f"\nConnecting to Hugging Face dataset repository: {repo_id} ...")
     create_repo(repo_id, repo_type="dataset", token=token, exist_ok=True)
 
-    print(f"Uploading {local_dir} to https://huggingface.co/datasets/{repo_id} ...")
-    t0 = time.time()
-    api.upload_folder(
-        folder_path=str(local_dir),
-        repo_id=repo_id,
-        repo_type="dataset",
-        token=token,
-    )
-    print(f"Upload complete in {(time.time() - t0)/60:.2f} minutes!")
+    try:
+        remote_files = set(api.list_repo_files(repo_id=repo_id, repo_type="dataset", token=token))
+    except Exception as err:
+        print(f"Note: Could not fetch remote file list ({err}), will upload all files.")
+        remote_files = set()
+
+    all_files = sorted([p for p in local_dir.rglob("*") if p.is_file()])
+    total_files = len(all_files)
+    print(f"\nFound {total_files} files in {local_dir} to upload to https://huggingface.co/datasets/{repo_id}")
+
+    t_all = time.time()
+    for i, file_path in enumerate(all_files, 1):
+        rel_path = file_path.relative_to(local_dir).as_posix()
+        size_mb = file_path.stat().st_size / 1e6
+
+        if rel_path in remote_files:
+            print(f"[{i:02d}/{total_files:02d}] Skipping (already on Hub): {rel_path}")
+            continue
+
+        print(f"[{i:02d}/{total_files:02d}] Uploading {rel_path} ({size_mb:.1f} MB)... ", end="", flush=True)
+        uploaded = False
+        for attempt in range(1, 4):
+            t0 = time.time()
+            try:
+                api.upload_file(
+                    path_or_fileobj=str(file_path),
+                    path_in_repo=rel_path,
+                    repo_id=repo_id,
+                    repo_type="dataset",
+                    token=token,
+                )
+                print(f"Done ({time.time() - t0:.1f}s)")
+                uploaded = True
+                break
+            except Exception as e:
+                print(f"\n  [Retry {attempt}/3] Upload error: {e}. Retrying in 3s...")
+                time.sleep(3)
+        if not uploaded:
+            raise RuntimeError(f"Failed to upload {rel_path} after 3 attempts.")
+
+    print(f"\n[SUCCESS] All {total_files} files uploaded in {(time.time() - t_all)/60:.2f} minutes!")
     print(f"Dataset is now live at: https://huggingface.co/datasets/{repo_id}")
 
 
@@ -117,7 +164,7 @@ def main():
 
     t_start = time.time()
 
-    # Generate Signup Parquet Shards
+    # Generate Signup Parquet Shards (caches if already on disk)
     generate_and_save_parquet(
         generator_fn=synthesize_signup_dataset,
         total_rows=args.rows,
@@ -126,7 +173,7 @@ def main():
         name="signup",
     )
 
-    # Generate Payment Parquet Shards
+    # Generate Payment Parquet Shards (caches if already on disk)
     generate_and_save_parquet(
         generator_fn=synthesize_payment_dataset,
         total_rows=args.rows,
