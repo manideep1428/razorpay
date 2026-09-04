@@ -1,6 +1,7 @@
 """Test FraudShield AI models against the held-out test split from Hugging Face Hub."""
 
 import argparse
+import os
 import socket
 import time
 
@@ -24,8 +25,8 @@ from trust_radar.utils.synthetic import synthesize_signup_edges
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Test FraudShield AI against Hugging Face test splits.")
-    parser.add_argument("--repo-id", type=str, required=True, help="Hugging Face Dataset repo id, e.g. 'username/fraudshield-10m'")
-    parser.add_argument("--token", type=str, default=None, help="Hugging Face API token (for private datasets)")
+    parser.add_argument("--repo-id", type=str, default="vicky1428/fraudshield-10m", help="Hugging Face Dataset repo id (default: 'vicky1428/fraudshield-10m')")
+    parser.add_argument("--token", type=str, default=None, help="Hugging Face API token (optional for public dataset)")
     parser.add_argument("--test-rows", type=int, default=10_000, help="Number of test samples to score (default: 10,000)")
     return parser.parse_args()
 
