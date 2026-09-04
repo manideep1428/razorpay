@@ -65,23 +65,23 @@ only trial and discounted plans are scored.
 ```
 razor-hac/
 ├── pyproject.toml
+├── requirements.txt
 ├── README.md
-├── main.py
-├── artifacts/
-├── notebooks/
-│   ├── 01_signup_gnn.ipynb
-│   ├── 02_payment_model.ipynb
-│   └── 03_evaluation.ipynb
+├── train.py                 # Primary training entrypoint (streams from Hugging Face Hub)
+├── test.py                  # Primary evaluation entrypoint (held-out test split)
+├── upload_to_hf.py          # 10M synthetic dataset generator & HF Hub uploader
+├── artifacts/               # Trained model checkpoints (.pt, .joblib)
+├── data/                    # Local scratch directory (.gitkeep)
 ├── src/
 │   └── trust_radar/
 │       ├── __init__.py
-│       ├── config.py            # full categorized feature schema + configs
-│       ├── decisioning.py       # 0-100 scores, risk levels, tiered decisions
-│       ├── models/              # signup_gnn.py, payment_model.py
-│       ├── training/            # train_signup.py, train_payment.py
-│       ├── evaluation/          # evaluate_signup.py, evaluate_payment.py
-│       ├── inference/           # predict_signup.py, predict_payment.py
-│       └── utils/               # metrics, preprocessing, model_io, synthetic
+│       ├── config.py        # Feature schemas, hyperparams, and threshold configs
+│       ├── decisioning.py   # 0-100 scores, risk levels, tiered decisions
+│       ├── models/          # signup_gnn.py, payment_model.py
+│       ├── training/        # train_signup.py, train_payment.py
+│       ├── evaluation/      # evaluate_signup.py, evaluate_payment.py
+│       ├── inference/       # predict_signup.py, predict_payment.py
+│       └── utils/           # metrics, preprocessing, model_io, synthetic
 └── tests/
     ├── test_signup_model.py
     ├── test_payment_model.py
@@ -90,10 +90,35 @@ razor-hac/
 
 ---
 
-## 🚀 Getting Started
+## ⚡ Google Colab & Fast Start
+
+Because dataset streaming is connected directly to Hugging Face (`vicky1428/fraudshield-10m`), you don't need heavy notebooks or local data storage!
+
+### In Google Colab:
+```bash
+# 1. Clone repository
+!git clone https://github.com/manideep1428/razorpay.git
+%cd razorpay
+
+# 2. Install dependencies
+!pip install -r requirements.txt
+!pip install torch-geometric
+
+# 3. Train models directly from 10M HF dataset (uses GPU if available)
+!python train.py --epochs 100 --trees 300
+
+# 4. Evaluate against held-out test split
+!python test.py --test-rows 10000
+```
+
+---
+
+## 🚀 Local Usage
 
 ```bash
-uv sync
+uv sync  # or pip install -r requirements.txt
+python train.py
+python test.py
 ```
 
 ### Signup trust scoring
