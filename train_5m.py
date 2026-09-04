@@ -1,16 +1,13 @@
 """Scale training pipeline for 5,000,000 datasets on Google Colab or High-VRAM GPUs."""
 
+import argparse
 import gc
-import sys
 import time
-from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import torch
 
 from trust_radar.config import (
-    ARTIFACTS_DIR,
     FeatureConfig,
     PaymentModelConfig,
     SignupGNNConfig,
@@ -26,49 +23,68 @@ from trust_radar.utils.synthetic import (
 )
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train FraudShield AI models on large datasets.")
+    parser.add_argument("--samples", type=int, default=5_000_000, help="Number of records per model (default: 5,000,000)")
+    parser.add_argument("--epochs", type=int, default=100, help="GNN training epochs (default: 100)")
+    parser.add_argument("--trees", type=int, default=300, help="LightGBM boosting trees (default: 300)")
+    parser.add_argument("--calibrate", action="store_true", help="Enable 3-fold probability calibration for LightGBM")
+    parser.add_argument("--device", type=str, default=None, help="Compute device ('cuda' or 'cpu')")
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+    n_samples = args.samples
+    gnn_epochs = args.epochs
+
     print("=" * 75)
-    print("FRAUDSHIELD AI: TRAINING ON 5,000,000 RECORDS PER MODEL")
+    print(f"FRAUDSHIELD AI: TRAINING ON {n_samples:,} RECORDS PER MODEL")
     print("=" * 75)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if args.device:
+        device = torch.device(args.device)
+    else:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     print(f"PyTorch Compute Device: {device}")
-    if torch.cuda.is_available():
+    if device.type == "cuda" and torch.cuda.is_available():
         print(f"GPU Name             : {torch.cuda.get_device_name(0)}")
         print(f"VRAM Available       : {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
     else:
         print("Note: Running on CPU (GPU recommended for 5M scale)")
 
     feat_cfg = FeatureConfig()
-    N_SAMPLES = 5_000_000
 
     # -----------------------------------------------------------------------
-    # STAGE 1: SIGNUP TRUST MODEL (GraphSAGE GNN) - 5,000,000 Nodes
+    # STAGE 1: SIGNUP TRUST MODEL (GraphSAGE GNN)
     # -----------------------------------------------------------------------
     print("\n" + "-" * 75)
-    print("STAGE 1: GENERATING 5,000,000 SIGNUP NODES & GRAPH EDGES")
+    print(f"STAGE 1: GENERATING {n_samples:,} SIGNUP NODES & GRAPH EDGES")
     print("-" * 75)
     t0 = time.time()
 
-    # Fast memory-optimized synthesis without string identifiers
-    df_signup = synthesize_signup_dataset(n=N_SAMPLES, seed=42, include_identifiers=False)
+    df_signup = synthesize_signup_dataset(n=n_samples, seed=42)
     nodes = df_signup[feat_cfg.signup_numeric_features]
-    edges = synthesize_signup_edges(num_nodes=N_SAMPLES, avg_degree=4.0, seed=42)
-    data = build_graph_data(nodes, edges, labels=df_signup["label"])
+    edges = synthesize_signup_edges(num_nodes=n_samples, avg_degree=4.0, seed=42)
+    labels = df_signup["label"]
+
+    data = build_graph_data(nodes, edges, labels=labels)
+    abuse_rate = float(labels.mean())
 
     print(f"Graph constructed in {time.time() - t0:.2f}s:")
     print(f"  Nodes     : {data.num_nodes:,}")
     print(f"  Edges     : {data.num_edges:,}")
-    print(f"  Abuse Rate: {float(df_signup['label'].mean()):.4f}")
+    print(f"  Abuse Rate: {abuse_rate:.4f}")
 
-    # Free memory before GPU training
-    del df_signup, nodes, edges
+    # Immediately release raw DataFrames to preserve RAM
+    del df_signup, nodes, edges, labels
     gc.collect()
 
-    print("\nTRAINING SIGNUP GRAPHSAGE MODEL (5M Nodes, 100 Epochs)...")
+    print(f"\nTRAINING SIGNUP GRAPHSAGE MODEL ({n_samples:,} Nodes, {gnn_epochs} Epochs)...")
     t_train_gnn = time.time()
     cfg_signup = SignupGNNConfig(
-        epochs=100,
+        epochs=gnn_epochs,
         hidden_channels=64,
         learning_rate=0.005,
         pos_weight=5.0,
@@ -77,7 +93,7 @@ def main():
     gnn_time = time.time() - t_train_gnn
     print(f"[SUCCESS] GNN training complete in {gnn_time:.2f}s ({(gnn_time/60):.2f} min)!")
 
-    # Evaluate GNN on held-out test mask
+    # Evaluate GNN on held-out test split
     gnn_metrics = evaluate_signup_gnn(model_gnn, data, split="test", device=device)
     print(f"  Test ROC-AUC        : {gnn_metrics['roc_auc']:.4f}")
     print(f"  Test PR-AUC         : {gnn_metrics['pr_auc']:.4f}")
@@ -92,18 +108,22 @@ def main():
         torch.cuda.empty_cache()
 
     # -----------------------------------------------------------------------
-    # STAGE 2: PAYMENT ABUSE MODEL (LightGBM) - 5,000,000 Rows
+    # STAGE 2: PAYMENT ABUSE MODEL (LightGBM)
     # -----------------------------------------------------------------------
     print("\n" + "-" * 75)
-    print("STAGE 2: GENERATING 5,000,000 PAYMENT TRANSACTIONS")
+    print(f"STAGE 2: GENERATING {n_samples:,} PAYMENT TRANSACTIONS")
     print("-" * 75)
     t0 = time.time()
-    df_payment = synthesize_payment_dataset(n=N_SAMPLES, seed=42, include_identifiers=False)
+    df_payment = synthesize_payment_dataset(n=n_samples, seed=42)
 
     X = df_payment[feat_cfg.payment_features].copy()
     for col in feat_cfg.payment_categorical_features:
-        X[col] = X[col].astype("category")
+        if col in X.columns:
+            X[col] = X[col].astype("category")
     y = df_payment["label"]
+
+    del df_payment
+    gc.collect()
 
     print(f"Payment data generated in {time.time() - t0:.2f}s:")
     print(f"  Rows    : {len(X):,}")
@@ -112,14 +132,11 @@ def main():
     for cls_idx, count in y.value_counts().sort_index().items():
         print(f"    Class {cls_idx}: {count:,} ({count / len(y):.2%})")
 
-    del df_payment
-    gc.collect()
-
-    print("\nTRAINING MULTI-CLASS PAYMENT MODEL (LightGBM on 5M Rows)...")
+    print(f"\nTRAINING MULTI-CLASS PAYMENT MODEL (LightGBM {args.trees} Trees)...")
     t_train_pay = time.time()
-    cfg_pay = PaymentModelConfig(n_estimators=300, learning_rate=0.05)
+    cfg_pay = PaymentModelConfig(n_estimators=args.trees, learning_rate=0.05)
     model_pay, pay_metrics = train_payment_model(
-        X, y, config=cfg_pay, test_size=0.2, calibrate=True
+        X, y, config=cfg_pay, test_size=0.2, calibrate=args.calibrate
     )
     pay_time = time.time() - t_train_pay
     print(f"[SUCCESS] Payment model training complete in {pay_time:.2f}s ({(pay_time/60):.2f} min)!")
@@ -130,15 +147,18 @@ def main():
     print(f"  Abuse ROC-AUC       : {pay_metrics.get('abuse_roc_auc', 0):.4f}")
     print(f"  Saved Model         : {cfg_pay.model_path}")
 
+    del X, y
+    gc.collect()
+
     # -----------------------------------------------------------------------
     # FINAL PERSISTENCE SUMMARY
     # -----------------------------------------------------------------------
     print("\n" + "=" * 75)
-    print("ALL 5,000,000-ROW MODELS TRAINED & PERSISTED SUCCESSFULLY!")
+    print(f"ALL {n_samples:,}-ROW MODELS TRAINED & PERSISTED SUCCESSFULLY!")
     print("=" * 75)
-    print(f"1. GNN Checkpoint (100 Epochs) : {cfg_signup.checkpoint_path} ({cfg_signup.checkpoint_path.stat().st_size / 1024:.1f} KB)")
-    print(f"2. LightGBM Model (5M Rows)    : {cfg_pay.model_path} ({cfg_pay.model_path.stat().st_size / (1024 * 1024):.2f} MB)")
-    print(f"Total Combined Training Time   : {(gnn_time + pay_time)/60:.2f} minutes")
+    print(f"1. GNN Checkpoint ({gnn_epochs} Epochs) : {cfg_signup.checkpoint_path} ({cfg_signup.checkpoint_path.stat().st_size / 1024:.1f} KB)")
+    print(f"2. LightGBM Model ({n_samples:,} Rows)    : {cfg_pay.model_path} ({cfg_pay.model_path.stat().st_size / (1024 * 1024):.2f} MB)")
+    print(f"Total Combined Training Time      : {(gnn_time + pay_time)/60:.2f} minutes")
 
 
 if __name__ == "__main__":
