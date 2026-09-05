@@ -13,6 +13,14 @@ def _ipv4_getaddrinfo(*args, **kwargs):
     return ipv4 if ipv4 else res
 socket.getaddrinfo = _ipv4_getaddrinfo
 
+import sys
+from pathlib import Path
+
+# Ensure src/ is in sys.path regardless of execution directory
+_SRC_DIR = str(Path(__file__).resolve().parent / "src")
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
+
 import pandas as pd
 from datasets import load_dataset
 
