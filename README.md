@@ -102,9 +102,8 @@ Open `colab_train.ipynb` in Google Colab for interactive cells, GPU checks, metr
 !git clone https://github.com/manideep1428/razorpay.git
 %cd razorpay
 
-# 2. Install dependencies
-!pip install -r requirements.txt
-!pip install torch-geometric
+# 2. Install dependencies (Colab pre-installs PyTorch CUDA & pandas)
+!pip install -q torch-geometric lightgbm datasets huggingface-hub pyarrow
 
 # 3. Train models directly from HF dataset (smart shard loading, e.g. 500k rows)
 !python train.py --max-rows 500000 --epochs 100 --trees 300 --device cuda
