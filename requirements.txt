@@ -1,4 +1,4 @@
-# FraudShield AI (importable package: trust_radar) -- direct dependencies,
+# Tesseract (importable package: tesseract) -- direct dependencies,
 # pinned to the exact versions resolved in uv.lock and verified working in
 # this environment (Python >= 3.12, per pyproject.toml).
 #

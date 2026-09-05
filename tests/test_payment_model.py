@@ -2,16 +2,16 @@
 
 import numpy as np
 
-from trust_radar.config import (
+from tesseract.config import (
     PAYMENT_LABELS,
     FeatureConfig,
     PaymentModelConfig,
 )
-from trust_radar.decisioning import PAYMENT_ACTIONS
-from trust_radar.inference.predict_payment import PaymentPredictor
-from trust_radar.models.payment_model import PaymentAbuseModel
-from trust_radar.utils.model_io import load_tabular_model, save_tabular_model
-from trust_radar.utils.synthetic import synthesize_payment_dataset
+from tesseract.decisioning import PAYMENT_ACTIONS
+from tesseract.inference.predict_payment import PaymentPredictor
+from tesseract.models.payment_model import PaymentAbuseModel
+from tesseract.utils.model_io import load_tabular_model, save_tabular_model
+from tesseract.utils.synthetic import synthesize_payment_dataset
 
 _FAST_CFG = PaymentModelConfig(n_estimators=60)
 
@@ -63,11 +63,10 @@ def test_payment_predictor_plan_gating_and_actions():
 
     row = df.iloc[[0]]
 
-    # Full-price plans skip the model and are always allowed.
+    # Full-price plans are scored by the model and always allowed.
     full = predictor.score_transaction(row, plan_type="full_price")
-    assert full["scored"] is False
+    assert full["scored"] is True
     assert full["decision"] == "ALLOW"
-    assert full["payment_risk_score"] == 0
 
     # Trial plans are scored and return a valid tiered decision.
     trial = predictor.score_transaction(row, plan_type="trial")

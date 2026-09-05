@@ -1,14 +1,14 @@
-"""Global configuration for FraudShield AI models, feature schema, and decisioning.
+"""Global configuration for Tesseract AI models, feature schema, and decisioning.
 
-FraudShield AI ships two models:
+Tesseract AI ships two models:
 
 * **Signup Trust Model** -- a GraphSAGE / LightGBM classifier that emits a
   ``trust_score`` (0-100) and ``risk_level`` for every signup.
 * **Payment Abuse Model** -- a multi-class LightGBM classifier that emits a
   ``payment_risk_score`` (0-100) plus the most likely abuse type.
 
-The importable package remains ``trust_radar`` (the project's original name and
-editable-install entry point); only the product branding is FraudShield AI.
+The importable package remains ``tesseract`` (the project's original name and
+editable-install entry point); only the product branding is Tesseract AI.
 """
 
 from dataclasses import dataclass, field
@@ -113,7 +113,7 @@ SIGNUP_LABEL_COLUMNS: list[str] = ["label", "admin_reviewed", "review_result"]
 
 
 # ---------------------------------------------------------------------------
-# Payment feature schema (grouped exactly as in the FraudShield AI spec)
+# Payment feature schema (grouped exactly as in the Tesseract AI spec)
 # ---------------------------------------------------------------------------
 PAYMENT_FEATURE_GROUPS: dict[str, list[str]] = {
     "payment_identity": [
@@ -350,7 +350,7 @@ class PaymentModelConfig:
 
 @dataclass
 class FeatureConfig:
-    """Resolved feature schema for both FraudShield AI models.
+    """Resolved feature schema for both Tesseract AI models.
 
     The grouped dictionaries (:data:`SIGNUP_FEATURE_GROUPS` /
     :data:`PAYMENT_FEATURE_GROUPS`) are the single source of truth; the flat

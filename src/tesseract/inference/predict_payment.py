@@ -5,16 +5,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from trust_radar.config import PAYMENT_CATEGORICAL_FEATURES, PAYMENT_LABELS
-from trust_radar.decisioning import (
+from tesseract.config import PAYMENT_CATEGORICAL_FEATURES, PAYMENT_LABELS
+from tesseract.decisioning import (
     abuse_type_name,
     payment_block_target,
     payment_decision,
     requires_payment_scoring,
     risk_level_from_score,
 )
-from trust_radar.models.payment_model import PaymentAbuseModel
-from trust_radar.utils.model_io import load_tabular_model
+from tesseract.models.payment_model import PaymentAbuseModel
+from tesseract.utils.model_io import load_tabular_model
 
 
 class PaymentPredictor:
@@ -87,22 +87,7 @@ class PaymentPredictor:
             else self._plan_signal(row, "is_discounted")
         )
 
-        scored = requires_payment_scoring(
-            plan_type=plan_type, is_trial=is_trial, is_discounted=is_discounted
-        )
-
-        if not scored:
-            # Full-price plans skip the model entirely.
-            return {
-                "scored": False,
-                "payment_risk_score": 0,
-                "risk_level": "low",
-                "abuse_type": "legit",
-                "predicted_class": 0,
-                "decision": "ALLOW",
-                "block_target": None,
-            }
-
+        # Every transaction goes directly inside the model - NEVER skips
         risk = self.model.predict_risk(self._prepare_features(df))
         score = int(risk["payment_risk_score"][0])
         predicted_class = int(risk["predicted_class"][0])
@@ -115,6 +100,13 @@ class PaymentPredictor:
             else None
         )
 
+        proba = risk.get("probabilities")
+        class_probs = {}
+        if proba is not None and len(proba) > 0:
+            classes = getattr(self.model, "classes_", [0, 1, 2, 3])
+            for idx, c in enumerate(classes):
+                class_probs[abuse_type_name(int(c))] = round(float(proba[0][idx]), 4)
+
         return {
             "scored": True,
             "payment_risk_score": score,
@@ -123,6 +115,7 @@ class PaymentPredictor:
             "predicted_class": predicted_class,
             "decision": decision,
             "block_target": block_target,
+            "class_probabilities": class_probs,
         }
 
     def score_batch(self, df: pd.DataFrame) -> pd.DataFrame:

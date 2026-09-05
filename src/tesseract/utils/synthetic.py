@@ -1,7 +1,7 @@
-"""Schema-faithful synthetic data generators for FraudShield AI.
+"""Schema-faithful synthetic data generators for Tesseract AI.
 
 These produce pandas DataFrames whose columns match the feature schema declared
-in :mod:`trust_radar.config`, so notebooks and tests can exercise the full
+in :mod:`tesseract.config`, so notebooks and tests can exercise the full
 pipeline without a real dataset. A handful of "driver" features are correlated
 with the label so the models have genuine signal to learn; the long tail of
 features is filled with plausible noise.
@@ -11,7 +11,7 @@ features is filled with plausible noise.
 import numpy as np
 import pandas as pd
 
-from trust_radar.config import (
+from tesseract.config import (
     PAYMENT_IDENTIFIER_COLUMNS,
     SIGNUP_IDENTIFIER_COLUMNS,
     FeatureConfig,
@@ -324,7 +324,7 @@ def _fill_generic(col: str, n: int, rng: np.random.Generator) -> np.ndarray:
 def synthesize_signup_dataset(
     n: int = 2000, seed: int | None = 42
 ) -> pd.DataFrame:
-    """Generate a synthetic signup dataset with the streamlined FraudShield schema.
+    """Generate a synthetic signup dataset with the streamlined Tesseract schema.
 
     Returns a DataFrame containing identifier columns, every signup feature, and
     the label columns (``label``, ``admin_reviewed``, ``review_result``).
@@ -431,9 +431,11 @@ def synthesize_signup_dataset(
 
 
 def synthesize_signup_edges(
-    num_nodes: int, avg_degree: float = 4.0, seed: int | None = 42
+    num_nodes: int | pd.DataFrame, avg_degree: float = 4.0, seed: int | None = 42
 ) -> pd.DataFrame:
     """Generate a synthetic shared-device / shared-IP edge list for the graph."""
+    if isinstance(num_nodes, pd.DataFrame):
+        num_nodes = len(num_nodes)
     rng = np.random.default_rng(seed)
     num_edges = int(num_nodes * avg_degree)
     src = rng.integers(0, num_nodes, num_edges)
@@ -445,9 +447,9 @@ def synthesize_signup_edges(
 def synthesize_payment_dataset(
     n: int = 4000, seed: int | None = 42
 ) -> pd.DataFrame:
-    """Generate a synthetic payment dataset with the full FraudShield schema.
+    """Generate a synthetic payment dataset with the full Tesseract schema.
 
-    ``label`` follows :data:`trust_radar.config.PAYMENT_LABELS`:
+    ``label`` follows :data:`tesseract.config.PAYMENT_LABELS`:
     ``0=legit, 1=trial_abuse, 2=discount_abuse, 3=payment_fraud``.
     """
     rng = np.random.default_rng(seed)

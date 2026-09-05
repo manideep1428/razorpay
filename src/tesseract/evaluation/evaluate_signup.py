@@ -5,12 +5,12 @@ from pathlib import Path
 import torch
 from torch_geometric.data import Data
 
-from trust_radar.models.signup_gnn import SignupGraphSAGE
-from trust_radar.utils.metrics import (
+from tesseract.models.signup_gnn import SignupGraphSAGE
+from tesseract.utils.metrics import (
     compute_classification_metrics,
     optimal_threshold_cost,
 )
-from trust_radar.utils.model_io import load_gnn_model
+from tesseract.utils.model_io import load_gnn_model
 
 
 def evaluate_signup_gnn(

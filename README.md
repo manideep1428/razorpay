@@ -1,164 +1,218 @@
-# 🛡️ FraudShield AI
+# 🛡️ Tesseract AI
 
-FraudShield AI is an end-to-end Machine Learning + Graph Neural Network system
-for signup abuse mitigation and payment abuse detection. It produces
-**0-100 scores** and actionable, tiered decisions:
+**Tesseract AI** is an enterprise-grade Machine Learning + Graph Neural Network system for **signup abuse mitigation** and **multi-class payment abuse detection**. It powers real-time fraud scoring, producing calibrated **0–100 risk scores** and tiered operational decisions.
 
 ```text
-User Signup ──▶ Signup Trust Model  ──▶ trust_score (0-100)  ──▶ stored on user
-Payment     ──▶ Payment Abuse Model ──▶ payment_risk_score (0-100) + decision
-```
-
-> The importable Python package is `trust_radar` (the project's original name
-> and editable-install entry point). Only the product branding is FraudShield AI.
-
----
-
-## 🧠 Models
-
-### 1. Signup Trust Model (`SignupGraphSAGE`)
-Detects fake signups, multi-account abuse, bot signups, device farming, VPN
-abuse, trial farmers, and account-creation rings.
-
-- Binary labels: `0 = legit_user`, `1 = abuse_user`.
-- Output: `trust_score`, `risk_score`, `risk_level`.
-- Built on **PyTorch Geometric** GraphSAGE over shared device / IP / phone /
-  email-domain networks.
-
-```json
-{ "trust_score": 91, "risk_score": 9, "risk_level": "low" }
-```
-
-### 2. Payment Abuse Model (`PaymentAbuseModel`)
-A calibrated **multi-class LightGBM** classifier consuming the upstream
-`trust_score` plus payment, card, device, IP, velocity, and graph features.
-
-- Classes: `0 = legit`, `1 = trial_abuse`, `2 = discount_abuse`, `3 = payment_fraud`.
-- Output: `payment_risk_score` (0-100), `abuse_type`, and a `decision`.
-
-```json
-{ "payment_risk_score": 87, "abuse_type": "discount_abuse", "decision": "ALLOW_HIGH_PRIORITY_REVIEW" }
+User Signup  ──▶  Signup Trust Model (GraphSAGE GNN)  ──▶  trust_score (0-100)  ──▶ Stored in signups_db.json
+Payment Tx   ──▶  Payment Abuse Model (LightGBM)      ──▶  payment_risk_score   ──▶ Tiered Action in transactions_db.json
 ```
 
 ---
 
-## 🚦 Decision Logic (both models, on a 0-100 **risk** score)
+## 📦 Model Artifacts & Hugging Face Download
 
-| Risk score | Signup action | Payment action |
-|------------|---------------|----------------|
-| 0-40 | `ALLOW` | `ALLOW` |
-| 41-70 | `ALLOW_FLAG_REVIEW` | `ALLOW_FLAG_REVIEW` |
-| 71-94 | `ALLOW_HIGH_PRIORITY_REVIEW` | `ALLOW_HIGH_PRIORITY_REVIEW` |
-| 95-100 | `TEMP_SUSPEND_MANUAL_REVIEW` | `BLOCK` (trial / discount) |
+To keep the Git repository lightweight and adhere to best practices, **large model binary checkpoints (`.joblib`, `.pt`) are NOT tracked in Git** (managed via `.gitignore`).
 
-Plan gating: **full-price plans skip the payment model and are always allowed**;
-only trial and discounted plans are scored.
+### Hugging Face Models Hub
+All pretrained models are hosted on Hugging Face:
+🔗 **[vicky1428/fraudshield-models](https://huggingface.co/vicky1428/fraudshield-models)**
 
-> Disposable email, VPN, proxy, and Tor are **risk-increasing signals only** —
-> they never trigger an automatic rejection. Every decision is a pure function
-> of the final score.
+| Model File | Type | Architecture / Framework | Size | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| `payment_abuse_lgbm.joblib` | Tabular Classifier | Calibrated Multi-Class LightGBM | ~19 MB | Scores payment & card velocity abuse across 4 distinct classes |
+| `signup_graphsage.pt` | Graph Neural Network | PyTorch Geometric GraphSAGE | ~60 KB | Evaluates identity graphs (shared IP, device fingerprint, CIDR) |
+
+### How to Download Models
+
+#### Option 1: Automatic Download
+The built-in application server (`app.py`) automatically downloads missing model weights from Hugging Face on startup.
+
+#### Option 2: Download via Python Script
+```python
+from huggingface_hub import hf_hub_download
+
+# Download Payment Abuse Model
+hf_hub_download(
+    repo_id="vicky1428/fraudshield-models",
+    filename="payment_abuse_lgbm.joblib",
+    local_dir="models"
+)
+
+# Download Signup GraphSAGE Model
+hf_hub_download(
+    repo_id="vicky1428/fraudshield-models",
+    filename="signup_graphsage.pt",
+    local_dir="models"
+)
+```
+
+#### Option 3: Download via Hugging Face CLI
+```bash
+pip install huggingface-hub
+huggingface-cli download vicky1428/fraudshield-models payment_abuse_lgbm.joblib --local-dir models
+huggingface-cli download vicky1428/fraudshield-models signup_graphsage.pt --local-dir models
+```
+
+---
+
+## 💻 Local Development & Setup Rules
+
+Follow these rules to set up and run Tesseract locally:
+
+### 1. Prerequisites
+- **Python 3.12+**
+- Recommended environment tool: `uv` (or standard `venv` + `pip`)
+
+### 2. Environment Setup
+```bash
+# Clone the repository
+git clone https://github.com/manideep1428/razorpay.git
+cd razorpay
+
+# Create virtual environment with Python 3.12
+uv venv --python 3.12
+# On Windows:
+.venv\Scripts\activate
+# On Linux / macOS:
+source .venv/bin/activate
+
+# Install the editable package and dependencies
+uv pip install -e .
+# Alternatively using standard pip:
+pip install -e .
+pip install -r requirements.txt
+```
+
+### 3. Running the Real Model Serve Server
+Run the zero-dependency simulation and model-serving web server:
+```bash
+python app.py 8080
+```
+Open **[http://localhost:8080](http://localhost:8080)** in your browser:
+- **Sign Up (`/signup`)**: Real client telemetry extraction (IP, User-Agent, device fingerprint), passing into GraphSAGE to generate real `trust_score`.
+- **Payment Checkout (`/payment`)**: Choose between **Standard Plan ($19.00)** and **Free Trial ($0.00)**. Real card BIN analysis, database velocity detection, and LightGBM model scoring.
+- **Audit Database (`/admin`)**: Live inspection of entries logged in `signups_db.json` and `transactions_db.json`.
+- **Clear Database (`/clear`)**: Resets both JSON databases to `[]` for clean end-to-end test runs.
+
+### 4. Database Files (`signups_db.json` & `transactions_db.json`)
+- `signups_db.json` and `transactions_db.json` start as empty JSON arrays (`[]`).
+- Each user signup and payment transaction logs telemetry, extracted signals, and raw model inference outputs directly into these files.
+
+---
+
+## 🚦 Decision Rules, Statuses & How It Works
+
+Tesseract implements a 4-tier decision matrix along with enterprise business rules:
+
+### 1. Signup Decision Statuses (GraphSAGE GNN)
+Based on calculated `risk_score` (0 - 100):
+- **`ALLOW` (0 - 40)**: Clean, legitimate user profile.
+- **`ALLOW_FLAG_REVIEW` (41 - 70)**: Borderline indicators (e.g. shared device or datacenter IP); allowed without friction, queued for asynchronous review.
+- **`ALLOW_HIGH_PRIORITY_REVIEW` (71 - 94)**: High risk indicators; queued for urgent investigation.
+- **`TEMP_SUSPEND_MANUAL_REVIEW` (95 - 100)**: Coordinated fraud ring or bot farm detected; account temporarily locked.
+
+### 2. Payment Decision Statuses & Rules (LightGBM)
+- **Standard / Paid Plans ($19.00) are ALWAYS ALLOWED (`ALLOW`)**: Captures legitimate customer revenue without false positives.
+- **Free Trial Card Reuse Abuse (`BLOCK_TRIAL`)**: When a payment card is reused across multiple accounts for free trials, Tesseract detects the velocity and blocks the trial.
+- **High Risk Trial Abuse (`BLOCK`)**: Any trial registration with model `payment_risk_score >= 50` is blocked.
+- **`BLOCK_CARD_VELOCITY`**: Triggered when the same card attempts >5 transactions in a short window.
+- **`BLOCK_IP_VELOCITY`**: Triggered when a single IP floods multiple payment requests.
+- **`CHALLENGE_3DS`**: Step-up authentication required for anomalous payment parameters.
+
+### 3. Abuse Classification Categories
+LightGBM predicts probabilities across 4 distinct abuse classes:
+1. `0 = Legit`: Genuine user transaction.
+2. `1 = Trial Abuse`: Card recycling, multi-accounting to obtain recurring free trials.
+3. `2 = Card Velocity Fraud`: Automated card testing or rapid sequential transactions.
+4. `3 = Promo / Referral Abuse`: Exploiting referral codes and promo discounts.
+
+---
+
+## 📊 How to Generate Model Evaluation Graphs & Charts
+
+Tesseract includes a turnkey visualization generator script: [`generate_graphs.py`](generate_graphs.py).
+
+### Run the Graph Generator
+Ensure model weights exist in `models/` (or run `python app.py` once to download them), then run:
+```bash
+python generate_graphs.py
+```
+
+### Generated Artifacts (`artifacts/` directory)
+The script evaluates the models and outputs publication-quality visualizations:
+
+1. **`artifacts/payment_confusion_matrix.png`**:
+   - Normalized multi-class confusion matrix showing model classification precision across Legit, Trial Abuse, Card Velocity, and Promo Abuse.
+2. **`artifacts/payment_roc_curves.png`**:
+   - One-vs-Rest (OvR) ROC curves displaying AUC scores for each abuse category.
+3. **`artifacts/payment_feature_importance.png`**:
+   - Top 15 split gain feature importance rankings from LightGBM (card velocity, account age, proxy flags, trust score).
+4. **`artifacts/signup_risk_distribution.png`**:
+   - GraphSAGE risk score distribution comparing legitimate users vs coordinated fraud ring clusters.
+
+---
+
+## ⚡ Training Pipeline & Google Colab
+
+Tesseract models can be trained on synthetic data or streamed from the 10M record Hugging Face dataset:
+🔗 **[vicky1428/fraudshield-10m](https://huggingface.co/datasets/vicky1428/fraudshield-10m)**
+
+### Train Locally
+```bash
+# Train both models with smart shard streaming
+python train.py --max-rows 500000 --epochs 50 --trees 300
+```
+
+### Test Against Held-out Evaluation Split
+```bash
+python test.py --test-rows 10000
+```
+
+### Train in Google Colab (GPU Acceleration)
+Open [colab_train.ipynb](colab_train.ipynb) in Google Colab to train with full CUDA acceleration and automatically export trained weights.
 
 ---
 
 ## 📂 Project Structure
 
 ```
-razor-hac/
-├── pyproject.toml
-├── requirements.txt
-├── README.md
-├── train.py                 # Primary training entrypoint (streams from Hugging Face Hub)
-├── test.py                  # Primary evaluation entrypoint (held-out test split)
-├── artifacts/               # Trained model checkpoints (.pt, .joblib)
-├── data/                    # Local scratch directory (.gitkeep)
+razorpay/
+├── app.py                      # Real model serve & live simulation server (zero CSS/JS)
+├── train.py                    # Training pipeline streaming from Hugging Face Hub
+├── test.py                     # Evaluation pipeline against held-out test splits
+├── generate_graphs.py          # Generates evaluation charts, ROC curves & confusion matrices
+├── pyproject.toml              # Modern Hatchling build configuration (package: tesseract)
+├── requirements.txt            # Pinned requirements for pip environments
+├── README.md                   # System documentation & setup guide
+├── signups_db.json             # Clean local user database (generates on test runs)
+├── transactions_db.json        # Clean local transaction database (generates on test runs)
+├── models/
+│   ├── .gitkeep                # Keeps models directory in git (binaries are git-ignored)
+│   ├── payment_abuse_lgbm.joblib  (downloaded from HF Hub)
+│   └── signup_graphsage.pt        (downloaded from HF Hub)
+├── artifacts/                  # Generated plots and evaluation charts (.png)
 ├── src/
-│   └── trust_radar/
+│   └── tesseract/              # Core Python package
 │       ├── __init__.py
-│       ├── config.py        # Feature schemas, hyperparams, and threshold configs
-│       ├── decisioning.py   # 0-100 scores, risk levels, tiered decisions
-│       ├── models/          # signup_gnn.py, payment_model.py
-│       ├── training/        # train_signup.py, train_payment.py
-│       ├── evaluation/      # evaluate_signup.py, evaluate_payment.py
-│       ├── inference/       # predict_signup.py, predict_payment.py
-│       └── utils/           # metrics, preprocessing, model_io, synthetic
+│       ├── config.py           # Feature schemas, hyperparams, and threshold configs
+│       ├── decisioning.py      # 0-100 scores, risk levels, and 4-tier decisions
+│       ├── models/             # signup_gnn.py, payment_model.py
+│       ├── training/           # train_signup.py, train_payment.py
+│       ├── evaluation/         # evaluate_signup.py, evaluate_payment.py
+│       ├── inference/          # predict_signup.py, predict_payment.py
+│       └── utils/              # metrics, preprocessing, model_io, synthetic
 └── tests/
-    ├── test_signup_model.py
-    ├── test_payment_model.py
-    └── test_decisioning.py
+    ├── test_signup_model.py    # GNN forward pass, shape, and score tests
+    ├── test_payment_model.py   # LightGBM training, persistence, and batch tests
+    └── test_decisioning.py     # Threshold, plan gating, and metric tests
 ```
 
 ---
 
-## ⚡ Google Colab & Fast Start
+## 🧪 Running Tests
 
-You can train directly in Google Colab using GPU acceleration either with the turnkey notebook [colab_train.ipynb](file:///c:/Users/saima/OneDrive/Desktop/razor-hac/colab_train.ipynb) or from the terminal:
-
-### Option A: Open `colab_train.ipynb`
-Open `colab_train.ipynb` in Google Colab for interactive cells, GPU checks, metric plots, and one-click Drive/HF Hub export.
-
-### Option B: Terminal / Cell Quickstart
+Run the full pytest test suite:
 ```bash
-# 1. Clone repository
-!git clone https://github.com/manideep1428/razorpay.git
-%cd razorpay
-
-# 2. Install dependencies (Colab pre-installs PyTorch CUDA & pandas)
-!pip install -q torch-geometric lightgbm datasets huggingface-hub pyarrow
-
-# 3. Train models directly from HF dataset (smart shard loading, e.g. 500k rows)
-!python train.py --max-rows 500000 --epochs 100 --trees 300 --device cuda
-
-# 4. Evaluate against held-out test split
-!python test.py --test-rows 10000
+pytest tests/ -v
 ```
-
----
-
-## 🚀 Local Usage
-
-```bash
-uv sync  # or pip install -r requirements.txt
-python train.py
-python test.py
-```
-
-### Signup trust scoring
-
-```python
-from trust_radar.inference.predict_signup import SignupPredictor
-
-predictor = SignupPredictor(model_or_path="artifacts/signup_graphsage.pt")
-result = predictor.predict_single_node(node_idx=10, data=graph_data)
-# {'trust_score': 91, 'risk_score': 9, 'risk_level': 'low', 'decision': 'ALLOW', ...}
-```
-
-### Payment abuse scoring
-
-```python
-from trust_radar.inference.predict_payment import PaymentPredictor
-
-predictor = PaymentPredictor(model_or_path="artifacts/payment_abuse_lgbm.joblib")
-decision = predictor.score_transaction(transaction_row, plan_type="trial")
-# {'payment_risk_score': 87, 'abuse_type': 'discount_abuse',
-#  'risk_level': 'high', 'decision': 'ALLOW_HIGH_PRIORITY_REVIEW', ...}
-```
-
-### Synthetic data (schema-faithful)
-
-```python
-from trust_radar.utils.synthetic import (
-    synthesize_signup_dataset, synthesize_payment_dataset,
-)
-
-signup_df = synthesize_signup_dataset(n=2000)
-payment_df = synthesize_payment_dataset(n=4000)
-```
-
----
-
-## 🧪 Tests & Quality
-
-```bash
-uv run pytest tests/ -v
-uv run ruff check .
-```
+All tests run in-memory and validate decisioning, model scoring, and plan-gating logic.

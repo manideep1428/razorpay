@@ -6,14 +6,14 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from trust_radar.config import PAYMENT_LABELS, PaymentModelConfig
-from trust_radar.models.payment_model import PaymentAbuseModel
-from trust_radar.utils.metrics import (
+from tesseract.config import PAYMENT_LABELS, PaymentModelConfig
+from tesseract.models.payment_model import PaymentAbuseModel
+from tesseract.utils.metrics import (
     compute_classification_metrics,
     compute_multiclass_metrics,
     optimal_threshold_cost,
 )
-from trust_radar.utils.model_io import save_tabular_model
+from tesseract.utils.model_io import save_tabular_model
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -98,9 +98,9 @@ def train_payment_model(
 
 
 if __name__ == "__main__":
-    # Synthetic self-test using the FraudShield payment schema.
-    from trust_radar.config import FeatureConfig
-    from trust_radar.utils.synthetic import synthesize_payment_dataset
+    # Synthetic self-test using the Tesseract payment schema.
+    from tesseract.config import FeatureConfig
+    from tesseract.utils.synthetic import synthesize_payment_dataset
 
     cfg = FeatureConfig()
     df = synthesize_payment_dataset(n=3000, seed=7)

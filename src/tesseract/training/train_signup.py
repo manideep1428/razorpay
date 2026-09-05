@@ -8,10 +8,10 @@ import torch
 from torch import nn
 from torch_geometric.data import Data
 
-from trust_radar.config import SignupGNNConfig
-from trust_radar.models.signup_gnn import SignupGraphSAGE
-from trust_radar.utils.metrics import compute_classification_metrics
-from trust_radar.utils.model_io import save_gnn_model
+from tesseract.config import SignupGNNConfig
+from tesseract.models.signup_gnn import SignupGraphSAGE
+from tesseract.utils.metrics import compute_classification_metrics
+from tesseract.utils.model_io import save_gnn_model
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -119,10 +119,10 @@ def train_signup_gnn(
 
 
 if __name__ == "__main__":
-    # Synthetic self-test using the FraudShield signup schema.
-    from trust_radar.config import FeatureConfig
-    from trust_radar.utils.preprocessing import build_graph_data
-    from trust_radar.utils.synthetic import (
+    # Synthetic self-test using the Tesseract signup schema.
+    from tesseract.config import FeatureConfig
+    from tesseract.utils.preprocessing import build_graph_data
+    from tesseract.utils.synthetic import (
         synthesize_signup_dataset,
         synthesize_signup_edges,
     )

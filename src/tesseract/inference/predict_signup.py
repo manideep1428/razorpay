@@ -6,13 +6,13 @@ import numpy as np
 import torch
 from torch_geometric.data import Data
 
-from trust_radar.decisioning import (
+from tesseract.decisioning import (
     risk_level_from_score,
     risk_score_to_trust_score,
     signup_decision,
 )
-from trust_radar.models.signup_gnn import SignupGraphSAGE
-from trust_radar.utils.model_io import load_gnn_model
+from tesseract.models.signup_gnn import SignupGraphSAGE
+from tesseract.utils.model_io import load_gnn_model
 
 
 class SignupPredictor:

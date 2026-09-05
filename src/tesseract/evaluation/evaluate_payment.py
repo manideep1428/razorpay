@@ -5,14 +5,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from trust_radar.config import PAYMENT_LABELS
-from trust_radar.models.payment_model import PaymentAbuseModel
-from trust_radar.utils.metrics import (
+from tesseract.config import PAYMENT_LABELS
+from tesseract.models.payment_model import PaymentAbuseModel
+from tesseract.utils.metrics import (
     compute_classification_metrics,
     compute_multiclass_metrics,
     optimal_threshold_cost,
 )
-from trust_radar.utils.model_io import load_tabular_model
+from tesseract.utils.model_io import load_tabular_model
 
 
 def evaluate_payment_model(

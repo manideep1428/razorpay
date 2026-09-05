@@ -1,4 +1,4 @@
-"""Test FraudShield AI models against the held-out test split from Hugging Face Hub."""
+"""Test Tesseract models against the held-out test split from Hugging Face Hub."""
 
 import argparse
 import os
@@ -24,11 +24,11 @@ if _SRC_DIR not in sys.path:
 import pandas as pd
 from datasets import load_dataset
 
-from trust_radar.config import FeatureConfig
-from trust_radar.inference.predict_payment import PaymentPredictor
-from trust_radar.inference.predict_signup import SignupPredictor
-from trust_radar.utils.preprocessing import build_graph_data
-from trust_radar.utils.synthetic import synthesize_signup_edges
+from tesseract.config import FeatureConfig
+from tesseract.inference.predict_payment import PaymentPredictor
+from tesseract.inference.predict_signup import SignupPredictor
+from tesseract.utils.preprocessing import build_graph_data
+from tesseract.utils.synthetic import synthesize_signup_edges
 
 
 import math
@@ -47,7 +47,7 @@ def resolve_test_shards(category: str, test_rows: int | None) -> str | list[str]
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Test FraudShield AI against Hugging Face test splits.")
+    parser = argparse.ArgumentParser(description="Test Tesseract against Hugging Face test splits.")
     parser.add_argument("--repo-id", type=str, default="vicky1428/fraudshield-10m", help="Hugging Face Dataset repo id (default: 'vicky1428/fraudshield-10m')")
     parser.add_argument("--token", type=str, default=None, help="Hugging Face API token (optional for public dataset)")
     parser.add_argument("--test-rows", type=int, default=10_000, help="Number of test samples to score (default: 10,000)")

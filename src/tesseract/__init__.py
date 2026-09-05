@@ -1,14 +1,14 @@
-"""FraudShield AI -- signup trust scoring and payment abuse detection.
+"""Tesseract AI -- signup trust scoring and payment abuse detection.
 
-The importable package is ``trust_radar`` (the project's original name and
-editable-install entry point); the product is branded **FraudShield AI**.
+The importable package is ``tesseract`` (the project's original name and
+editable-install entry point); the product is branded **Tesseract AI**.
 
 Only lightweight, dependency-free symbols (config + decisioning) are re-exported
-here so ``import trust_radar`` stays fast. Import the models, training,
+here so ``import tesseract`` stays fast. Import the models, training,
 evaluation, and inference subpackages directly when you need PyTorch / LightGBM.
 """
 
-from trust_radar.config import (
+from tesseract.config import (
     PAYMENT_LABELS,
     SIGNUP_LABELS,
     DecisionConfig,
@@ -17,7 +17,7 @@ from trust_radar.config import (
     SignupGNNConfig,
     SignupModelConfig,
 )
-from trust_radar.decisioning import (
+from tesseract.decisioning import (
     abuse_type_name,
     payment_decision,
     probability_to_risk_score,

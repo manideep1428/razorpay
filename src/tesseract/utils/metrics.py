@@ -1,4 +1,4 @@
-"""Evaluation metrics for FraudShield AI (binary signup + multi-class payment)."""
+"""Evaluation metrics for Tesseract AI (binary signup + multi-class payment)."""
 
 
 import numpy as np

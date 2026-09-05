@@ -4,13 +4,13 @@ import numpy as np
 import torch
 from torch_geometric.data import Data
 
-from trust_radar.config import FeatureConfig
-from trust_radar.decisioning import RISK_LEVELS, SIGNUP_ACTIONS
-from trust_radar.inference.predict_signup import SignupPredictor
-from trust_radar.models.signup_gnn import SignupGraphSAGE
-from trust_radar.utils.model_io import load_gnn_model, save_gnn_model
-from trust_radar.utils.preprocessing import build_graph_data
-from trust_radar.utils.synthetic import (
+from tesseract.config import FeatureConfig
+from tesseract.decisioning import RISK_LEVELS, SIGNUP_ACTIONS
+from tesseract.inference.predict_signup import SignupPredictor
+from tesseract.models.signup_gnn import SignupGraphSAGE
+from tesseract.utils.model_io import load_gnn_model, save_gnn_model
+from tesseract.utils.preprocessing import build_graph_data
+from tesseract.utils.synthetic import (
     synthesize_signup_dataset,
     synthesize_signup_edges,
 )

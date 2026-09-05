@@ -26,10 +26,15 @@ hf_cache/
 huggingface/
 datasets_cache/
 
-# Trained model artifacts (large binaries, regeneratable via the training
-# notebooks/pipelines) -- keep the directory via artifacts/.gitkeep.
+# Trained model artifacts (large binaries, regeneratable or downloaded from Hugging Face)
 artifacts/*
 !artifacts/.gitkeep
+models/*
+!models/.gitkeep
+*.pt
+*.joblib
+*.bin
+*.onnx
 
 # Jupyter
 .ipynb_checkpoints/

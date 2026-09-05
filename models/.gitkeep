@@ -1,0 +1,3 @@
+# Keeps the data/ directory tracked in git.
+# Generated datasets go here (see generate_signup_data.py / generate_payment_data.py)
+# and are gitignored via data/* in .gitignore.

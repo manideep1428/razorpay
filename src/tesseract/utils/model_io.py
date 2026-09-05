@@ -1,13 +1,36 @@
 """Model persistence utilities for GNNs and Tabular estimators."""
 
 from pathlib import Path
+import pathlib
+import sys
+import types
 from typing import Any
 
 import joblib
 import torch
 
-from trust_radar.models.payment_model import PaymentAbuseModel
-from trust_radar.models.signup_gnn import SignupGraphSAGE
+# Ensure cross-platform compatibility when loading models trained on Linux / Colab on Windows
+if sys.platform.startswith("win"):
+    pathlib.PosixPath = pathlib.WindowsPath
+
+if "pathlib._local" not in sys.modules:
+    _local_mod = types.ModuleType("pathlib._local")
+    _local_mod.Path = pathlib.Path
+    _local_mod.PosixPath = getattr(pathlib, "WindowsPath", pathlib.Path)
+    _local_mod.WindowsPath = getattr(pathlib, "WindowsPath", pathlib.Path)
+    sys.modules["pathlib._local"] = _local_mod
+
+# Backward compatibility for models pickled under legacy 'trust_radar' namespace
+import importlib
+for _mod_suffix in ["", ".models", ".models.payment_model", ".models.signup_gnn", ".config", ".decisioning", ".utils"]:
+    try:
+        _real_mod = importlib.import_module(f"tesseract{_mod_suffix}")
+        sys.modules[f"trust_radar{_mod_suffix}"] = _real_mod
+    except Exception:
+        pass
+
+from tesseract.models.payment_model import PaymentAbuseModel
+from tesseract.models.signup_gnn import SignupGraphSAGE
 
 
 def save_gnn_model(

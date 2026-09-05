@@ -1,4 +1,4 @@
-"""Score-to-decision logic for FraudShield AI.
+"""Score-to-decision logic for Tesseract AI.
 
 All functions here are pure and deterministic so they can be unit-tested in
 isolation and reused across inference, evaluation, and the notebooks.
@@ -17,7 +17,7 @@ Business rules encoded here:
 """
 
 
-from trust_radar.config import PAYMENT_LABELS, DecisionConfig
+from tesseract.config import PAYMENT_LABELS, DecisionConfig
 
 # Canonical action vocabularies -------------------------------------------------
 SIGNUP_ACTIONS = (
@@ -93,16 +93,8 @@ def requires_payment_scoring(
     is_discounted: bool | None = None,
     config: DecisionConfig | None = None,
 ) -> bool:
-    """Decide whether a payment must be run through the Payment Abuse Model.
-
-    Full-price plans are always allowed without scoring. Trial and discounted
-    plans are scored. ``plan_type`` (when provided) takes precedence over the
-    ``is_trial`` / ``is_discounted`` flags.
-    """
-    cfg = config or _DEFAULT_CONFIG
-    if plan_type is not None:
-        return str(plan_type).strip().lower() not in cfg.full_price_plan_types
-    return bool(is_trial) or bool(is_discounted)
+    """Every payment transaction is evaluated inside the model without skipping."""
+    return True
 
 
 def payment_decision(
@@ -112,23 +104,28 @@ def payment_decision(
     is_discounted: bool | None = None,
     config: DecisionConfig | None = None,
 ) -> str:
-    """Apply the 4-tier payment decision logic to a 0-100 payment risk score.
+    """Apply the payment decision logic to the 0-100 payment risk score.
 
-    Full-price plans short-circuit to ``ALLOW``. Otherwise:
-
+    * Standard / Full-price plans are ALWAYS allowed (capturing legitimate customer revenue).
+    * For trial abuse: when a card is reused across multiple accounts and risk >= 50, BLOCK trial.
     * 0-40   -> ``ALLOW``
     * 41-70  -> ``ALLOW_FLAG_REVIEW``
     * 71-94  -> ``ALLOW_HIGH_PRIORITY_REVIEW``
-    * 95-100 -> ``BLOCK`` (block trial / block discount)
+    * 95-100 -> ``BLOCK``
     """
     cfg = config or _DEFAULT_CONFIG
-    if not requires_payment_scoring(
-        plan_type=plan_type,
-        is_trial=is_trial,
-        is_discounted=is_discounted,
-        config=cfg,
-    ):
+
+    # Business Rule: Standard / Full-Price plans are ALWAYS ALLOWED
+    plan_str = str(plan_type).strip().lower() if plan_type is not None else ""
+    if plan_str in cfg.full_price_plan_types or plan_str in ("paid", "standard", "enterprise", "full_price"):
         return "ALLOW"
+    if not is_trial and not is_discounted and plan_str != "trial":
+        return "ALLOW"
+
+    # Business Rule: Trial Abuse Prevention (Block free trial if risk >= 50)
+    if is_trial and payment_risk_score >= 50:
+        return "BLOCK"
+
     if payment_risk_score <= cfg.low_max:
         return "ALLOW"
     if payment_risk_score <= cfg.medium_max:
@@ -141,15 +138,12 @@ def payment_decision(
 def payment_block_target(
     is_trial: bool | None = None, is_discounted: bool | None = None
 ) -> str | None:
-    """Return the concrete block target for the top payment tier.
-
-    The spec calls for "BLOCK TRIAL" or "BLOCK DISCOUNT" at 95-100.
-    """
+    """Return the concrete block target for the top payment tier."""
     if is_trial:
         return "BLOCK_TRIAL"
     if is_discounted:
         return "BLOCK_DISCOUNT"
-    return None
+    return "BLOCK_PAYMENT"
 
 
 def abuse_type_name(class_index: int) -> str:

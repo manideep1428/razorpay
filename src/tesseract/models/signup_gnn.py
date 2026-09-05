@@ -1,4 +1,4 @@
-"""GraphSAGE Signup Trust Model for FraudShield AI.
+"""GraphSAGE Signup Trust Model for Tesseract AI.
 
 The model detects fake signups, multi-account abuse, bot signups, device
 farming, VPN abuse, trial farmers, and account-creation rings by propagating
@@ -6,7 +6,7 @@ information across shared device, IP, phone, and email-domain networks.
 
 It is a binary classifier (``0 = legit_user``, ``1 = abuse_user``) whose
 probability output is converted into a 0-100 ``risk_score`` and its complement
-``trust_score`` via :mod:`trust_radar.decisioning`.
+``trust_score`` via :mod:`tesseract.decisioning`.
 """
 
 
@@ -105,7 +105,7 @@ class SignupGraphSAGE(nn.Module):
     def predict_scores(
         self, x: torch.Tensor, edge_index: torch.Tensor
     ) -> dict[str, np.ndarray]:
-        """Compute FraudShield trust/risk scores for every node.
+        """Compute Tesseract trust/risk scores for every node.
 
         Returns a dict with:
             * ``abuse_probability`` -- raw 0-1 abuse probability.

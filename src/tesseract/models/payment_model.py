@@ -1,11 +1,11 @@
-"""Multi-class Payment Abuse Model for FraudShield AI.
+"""Multi-class Payment Abuse Model for Tesseract AI.
 
 A calibrated LightGBM classifier that detects trial abuse, discount / coupon
 abuse, shared-card abuse, promo farming, and payment fraud. It consumes the
 upstream ``trust_score`` alongside payment, card, device, IP, velocity, and
 graph features.
 
-Classes (see :data:`trust_radar.config.PAYMENT_LABELS`)::
+Classes (see :data:`tesseract.config.PAYMENT_LABELS`)::
 
     0 = legit
     1 = trial_abuse
@@ -22,8 +22,8 @@ import numpy as np
 import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
 
-from trust_radar.config import PaymentModelConfig
-from trust_radar.decisioning import abuse_type_name
+from tesseract.config import PaymentModelConfig
+from tesseract.decisioning import abuse_type_name
 
 
 class PaymentAbuseModel:

@@ -1,4 +1,4 @@
-"""Train FraudShield AI models using datasets streamed/loaded directly from Hugging Face Hub."""
+"""Train Tesseract models using datasets streamed/loaded directly from Hugging Face Hub."""
 
 import argparse
 import gc
@@ -26,16 +26,16 @@ import pandas as pd
 import torch
 from datasets import load_dataset
 
-from trust_radar.config import (
+from tesseract.config import (
     FeatureConfig,
     PaymentModelConfig,
     SignupGNNConfig,
 )
-from trust_radar.evaluation.evaluate_signup import evaluate_signup_gnn
-from trust_radar.training.train_payment import train_payment_model
-from trust_radar.training.train_signup import train_signup_gnn
-from trust_radar.utils.preprocessing import build_graph_data
-from trust_radar.utils.synthetic import synthesize_signup_edges
+from tesseract.evaluation.evaluate_signup import evaluate_signup_gnn
+from tesseract.training.train_payment import train_payment_model
+from tesseract.training.train_signup import train_signup_gnn
+from tesseract.utils.preprocessing import build_graph_data
+from tesseract.utils.synthetic import synthesize_signup_edges
 
 
 import math
@@ -54,7 +54,7 @@ def resolve_shards(category: str, split: str, max_rows: int | None) -> str | lis
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Train FraudShield AI directly from Hugging Face Datasets.")
+    parser = argparse.ArgumentParser(description="Train Tesseract directly from Hugging Face Datasets.")
     parser.add_argument("--repo-id", type=str, default="vicky1428/fraudshield-10m", help="Hugging Face Dataset repo id (default: 'vicky1428/fraudshield-10m')")
     parser.add_argument("--token", type=str, default=None, help="Hugging Face API token (optional for public dataset)")
     parser.add_argument("--max-rows", type=int, default=None, help="Limit number of rows to load (default: all)")

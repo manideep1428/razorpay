@@ -2,13 +2,13 @@
 
 import numpy as np
 
-from trust_radar.config import (
+from tesseract.config import (
     PAYMENT_IDENTIFIER_COLUMNS,
     PAYMENT_LABELS,
     SIGNUP_IDENTIFIER_COLUMNS,
     FeatureConfig,
 )
-from trust_radar.decisioning import (
+from tesseract.decisioning import (
     payment_decision,
     probability_to_risk_score,
     requires_payment_scoring,
@@ -16,8 +16,8 @@ from trust_radar.decisioning import (
     risk_score_to_trust_score,
     signup_decision,
 )
-from trust_radar.utils.metrics import compute_multiclass_metrics, multiclass_confusion
-from trust_radar.utils.synthetic import (
+from tesseract.utils.metrics import compute_multiclass_metrics, multiclass_confusion
+from tesseract.utils.synthetic import (
     synthesize_payment_dataset,
     synthesize_signup_dataset,
 )
@@ -42,9 +42,10 @@ def test_risk_level_tiers():
 
 
 def test_payment_decision_tiers_for_trial():
+    # Free trial abuse: risk score >= 50 is blocked to prevent card reuse across multiple accounts
     assert payment_decision(40, is_trial=True) == "ALLOW"
-    assert payment_decision(70, is_trial=True) == "ALLOW_FLAG_REVIEW"
-    assert payment_decision(94, is_trial=True) == "ALLOW_HIGH_PRIORITY_REVIEW"
+    assert payment_decision(70, is_trial=True) == "BLOCK"
+    assert payment_decision(94, is_trial=True) == "BLOCK"
     assert payment_decision(95, is_trial=True) == "BLOCK"
 
 
@@ -55,14 +56,14 @@ def test_payment_full_price_is_always_allowed():
 
 
 def test_requires_payment_scoring_gating():
+    # All transactions pass into the real model serving pipeline
     assert requires_payment_scoring(is_trial=True) is True
     assert requires_payment_scoring(is_discounted=True) is True
     assert requires_payment_scoring(plan_type="trial") is True
     assert requires_payment_scoring(plan_type="discounted") is True
-    assert requires_payment_scoring(plan_type="full_price") is False
-    assert requires_payment_scoring(plan_type="standard") is False
-    # No plan signal at all -> treated as full price (no scoring).
-    assert requires_payment_scoring() is False
+    assert requires_payment_scoring(plan_type="full_price") is True
+    assert requires_payment_scoring(plan_type="standard") is True
+    assert requires_payment_scoring() is True
 
 
 def test_score_conversions_match_spec_examples():
